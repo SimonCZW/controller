@@ -79,16 +79,24 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
         this.context = Preconditions.checkNotNull(context);
     }
 
+    // invoke by blueprint: clustered-datastore.xml
     public static DistributedEntityOwnershipService start(final ActorContext context,
             final EntityOwnerSelectionStrategyConfig strategyConfig) {
+        // context是什么: ActorContext
+
         ActorRef shardManagerActor = context.getShardManager();
 
         Configuration configuration = context.getConfiguration();
+        // 获取member列表?
         Collection<MemberName> entityOwnersMemberNames = configuration.getUniqueMemberNamesForAllShards();
+        // Parameter1: module shard配置, the configuration of the new shard.
+        // P2: used to obtain the Props for creating the shard actor instance.
+        // P3: null, 意味着使用默认
         CreateShard createShard = new CreateShard(new ModuleShardConfiguration(EntityOwners.QNAME.getNamespace(),
                 "entity-owners", ENTITY_OWNERSHIP_SHARD_NAME, ModuleShardStrategy.NAME, entityOwnersMemberNames),
                         newShardBuilder(context, strategyConfig), null);
 
+        // 异步操作?
         Future<Object> createFuture = context.executeOperationAsync(shardManagerActor,
                 createShard, MESSAGE_TIMEOUT);
 
@@ -103,9 +111,11 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
             }
         }, context.getClientDispatcher());
 
+        // 创建DistributedEOS
         return new DistributedEntityOwnershipService(context);
     }
 
+    // 发消息给shardActor
     private void executeEntityOwnershipShardOperation(final ActorRef shardActor, final Object message) {
         Future<Object> future = context.executeOperationAsync(shardActor, message, MESSAGE_TIMEOUT);
         future.onComplete(new OnComplete<Object>() {
@@ -123,6 +133,7 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
     @VisibleForTesting
     void executeLocalEntityOwnershipShardOperation(final Object message) {
         if (localEntityOwnershipShard == null) {
+            // 找到entity-ownership的本地shard ActorRef
             Future<ActorRef> future = context.findLocalShardAsync(ENTITY_OWNERSHIP_SHARD_NAME);
             future.onComplete(new OnComplete<ActorRef>() {
                 @Override
@@ -131,6 +142,7 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
                         LOG.error("Failed to find local {} shard", ENTITY_OWNERSHIP_SHARD_NAME, failure);
                     } else {
                         localEntityOwnershipShard = shardActor;
+                        // 发消息给本地shard actor
                         executeEntityOwnershipShardOperation(localEntityOwnershipShard, message);
                     }
                 }

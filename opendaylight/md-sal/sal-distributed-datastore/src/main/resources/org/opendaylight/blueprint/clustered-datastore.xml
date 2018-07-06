@@ -172,6 +172,9 @@
     <argument ref="strategiesProps"/>
   </bean>
 
+  <!--
+    实例化DistributedEntityOwnershipService
+  -->
   <bean id="distributedEntityOwnershipService" class="org.opendaylight.controller.cluster.datastore.entityownership.DistributedEntityOwnershipService"
           factory-method="start" destroy-method="close">
     <argument>
