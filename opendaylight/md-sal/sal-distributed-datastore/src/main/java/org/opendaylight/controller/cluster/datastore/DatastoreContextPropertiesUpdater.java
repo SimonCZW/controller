@@ -40,6 +40,9 @@ public class DatastoreContextPropertiesUpdater implements AutoCloseable {
         update(props);
     }
 
+    // 传入的listener是datastore
+    //  ClientBackedDataStore.java 本地datastore
+    //  DistributedDataStore.java 分布式datastore
     public void setListener(final Listener listener) {
         this.listener = listener;
     }

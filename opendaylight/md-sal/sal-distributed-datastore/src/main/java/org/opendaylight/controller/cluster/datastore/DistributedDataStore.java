@@ -36,6 +36,8 @@ public class DistributedDataStore extends AbstractDataStore {
     @VisibleForTesting
     DistributedDataStore(final ActorContext actorContext, final ClientIdentifier identifier) {
         super(actorContext, identifier);
+        // 与ClientBackedDataStore不同, client是本地的datastore，其创建transactionChain直接调用本地的datastore client actor即可
+        // 而distributed datastore需要TransactionContextFactory
         this.txContextFactory = new TransactionContextFactory(getActorContext(), getIdentifier());
     }
 

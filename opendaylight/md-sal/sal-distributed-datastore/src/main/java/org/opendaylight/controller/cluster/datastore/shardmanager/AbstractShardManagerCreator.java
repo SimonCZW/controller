@@ -122,6 +122,7 @@ public abstract class AbstractShardManagerCreator<T extends AbstractShardManager
 
     public Props props() {
         verify();
+        // 创建shard manager actor
         return Props.create(ShardManager.class, this);
     }
 }

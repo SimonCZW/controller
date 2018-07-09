@@ -125,6 +125,7 @@ public class ActorContext {
             ClusterWrapper clusterWrapper, Configuration configuration,
             DatastoreContext datastoreContext, PrimaryShardInfoFutureCache primaryShardInfoCache) {
         this.actorSystem = actorSystem;
+        // shard manager actor
         this.shardManager = shardManager;
         this.clusterWrapper = clusterWrapper;
         this.configuration = configuration;
@@ -134,6 +135,7 @@ public class ActorContext {
 
         final LogicalDatastoreType convertedType =
                 LogicalDatastoreType.valueOf(datastoreContext.getLogicalStoreType().name());
+        // shard策略
         this.shardStrategyFactory = new ShardStrategyFactory(configuration, convertedType);
 
         setCachedProperties();
@@ -214,7 +216,7 @@ public class ActorContext {
         if (ret != null) {
             return ret;
         }
-        Future<Object> future = executeOperationAsync(shardManager,
+        Future<Object> future = executeOperationAsync(FindPrimary,
                 new FindPrimary(shardName, true), shardInitializationTimeout);
 
         return future.transform(new Mapper<Object, PrimaryShardInfo>() {
@@ -277,6 +279,7 @@ public class ActorContext {
      *
      * @param shardName the name of the local shard that needs to be found
      */
+    // 比如被 DistributedEntityOwnershipService调用
     public Future<ActorRef> findLocalShardAsync(final String shardName) {
         Future<Object> future = executeOperationAsync(shardManager,
                 new FindLocalShard(shardName, true), shardInitializationTimeout);

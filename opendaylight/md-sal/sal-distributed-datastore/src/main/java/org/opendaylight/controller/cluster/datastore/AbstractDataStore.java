@@ -73,6 +73,17 @@ public abstract class AbstractDataStore implements DistributedDataStoreInterface
     private final ClientIdentifier identifier;
     private final DataStoreClient client;
 
+    /**
+     * 初始化Datastore:
+     *      创建shard manager
+     *      创建本地datastore client actor
+     * @param actorSystem
+     * @param cluster
+     * @param configuration config read from ./configuration/initial/module-shards.conf;
+     *                                     ./configuration/initial/modules.conf;
+     * @param datastoreContextFactory
+     * @param restoreFromSnapshot
+     */
     @SuppressWarnings("checkstyle:IllegalCatch")
     protected AbstractDataStore(final ActorSystem actorSystem, final ClusterWrapper cluster,
             final Configuration configuration, final DatastoreContextFactory datastoreContextFactory,
@@ -87,11 +98,14 @@ public abstract class AbstractDataStore implements DistributedDataStoreInterface
 
         LOG.info("Creating ShardManager : {}", shardManagerId);
 
+        // shard派发器: 作用管理线程，将线程分配给actor，并给actor机会处理他们的邮箱
         String shardDispatcher =
                 new Dispatchers(actorSystem.dispatchers()).getDispatcherPath(Dispatchers.DispatcherType.Shard);
 
+        // Maintains a cache of PrimaryShardInfo Future instances per shard.
         PrimaryShardInfoFutureCache primaryShardInfoCache = new PrimaryShardInfoFutureCache();
 
+        // 创建shard manager creator, 用于创建shard manager actor
         ShardManagerCreator creator = new ShardManagerCreator().cluster(cluster).configuration(configuration)
                 .datastoreContextFactory(datastoreContextFactory)
                 .waitTillReadyCountDownLatch(waitTillReadyCountDownLatch)
@@ -99,10 +113,13 @@ public abstract class AbstractDataStore implements DistributedDataStoreInterface
                 .restoreFromSnapshot(restoreFromSnapshot)
                 .distributedDataStore(this);
 
+        // 先创建了shard manager actor: createShardManager(actorSystem, creator, shardDispatcher, shardManagerId)
+        // 再创建ActorContext
         actorContext = new ActorContext(actorSystem, createShardManager(actorSystem, creator, shardDispatcher,
                 shardManagerId), cluster, configuration, datastoreContextFactory.getBaseDatastoreContext(),
                 primaryShardInfoCache);
 
+        // 创建本地datastore的Client actor: 先定props
         final Props clientProps = DistributedDataStoreClientActor.props(cluster.getCurrentMemberName(),
             datastoreContextFactory.getBaseDatastoreContext().getDataStoreName(), actorContext);
         final ActorRef clientActor = actorSystem.actorOf(clientProps);
@@ -110,6 +127,7 @@ public abstract class AbstractDataStore implements DistributedDataStoreInterface
             client = DistributedDataStoreClientActor.getDistributedDataStoreClient(clientActor, 30, TimeUnit.SECONDS);
         } catch (Exception e) {
             LOG.error("Failed to get actor for {}", clientProps, e);
+            // 终止client actor
             clientActor.tell(PoisonPill.getInstance(), ActorRef.noSender());
             Throwables.throwIfUnchecked(e);
             throw new RuntimeException(e);
@@ -222,6 +240,7 @@ public abstract class AbstractDataStore implements DistributedDataStoreInterface
         actorContext.setSchemaContext(schemaContext);
     }
 
+    // datastore配置更新会被调用：DatastoreContextPropertiesUpdater
     @Override
     public void onDatastoreContextUpdated(final DatastoreContextFactory contextFactory) {
         LOG.info("DatastoreContext updated for data store {}", actorContext.getDataStoreName());
@@ -284,6 +303,9 @@ public abstract class AbstractDataStore implements DistributedDataStoreInterface
 
         for (int i = 0; i < 100; i++) {
             try {
+                // 从actorSystem创建shard manager
+                // creater.props() 创建了shard manager
+                // .withDispatcher() 设置actor的派发员(调度员)
                 return actorSystem.actorOf(creator.props().withDispatcher(shardDispatcher), shardManagerId);
             } catch (Exception e) {
                 lastException = e;

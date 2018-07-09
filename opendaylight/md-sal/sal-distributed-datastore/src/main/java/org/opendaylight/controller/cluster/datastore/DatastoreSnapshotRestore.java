@@ -35,6 +35,7 @@ public final class DatastoreSnapshotRestore {
     private final String restoreDirectoryPath;
     private final Map<String, DatastoreSnapshot> datastoreSnapshots = new ConcurrentHashMap<>();
 
+    // blueprint中传入参数: ./clustered-datastore-restore
     public static DatastoreSnapshotRestore instance(final String restoreDirectoryPath) {
         instance.compareAndSet(null, new DatastoreSnapshotRestore(restoreDirectoryPath));
         return instance.get();

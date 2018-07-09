@@ -24,6 +24,8 @@ public class ClusterWrapperImpl implements ClusterWrapper {
     public ClusterWrapperImpl(ActorSystem actorSystem) {
         Preconditions.checkNotNull(actorSystem, "actorSystem should not be null");
 
+        // 理解：通过akka.cluster沟通各个节点组成集群, actorSystem中有akka的配置
+        //  这里cluster协商建立?
         cluster = Cluster.get(actorSystem);
 
         Preconditions.checkState(cluster.getSelfRoles().size() > 0,
@@ -36,6 +38,7 @@ public class ClusterWrapperImpl implements ClusterWrapper {
         selfAddress = cluster.selfAddress();
     }
 
+    // 被ShardManager调用
     @Override
     public void subscribeToMemberEvents(ActorRef actorRef) {
         Preconditions.checkNotNull(actorRef, "actorRef should not be null");

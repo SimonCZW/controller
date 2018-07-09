@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import scala.concurrent.Await;
 import scala.concurrent.duration.Duration;
 
+// 提供akka actor system
 public class ActorSystemProviderImpl implements ActorSystemProvider, AutoCloseable {
     private static final String ACTOR_SYSTEM_NAME = "opendaylight-cluster-data";
     static final Logger LOG = LoggerFactory.getLogger(ActorSystemProviderImpl.class);
@@ -29,12 +30,20 @@ public class ActorSystemProviderImpl implements ActorSystemProvider, AutoCloseab
     private final ListenerRegistry<ActorSystemProviderListener> listeners = new ListenerRegistry<>();
 
     public ActorSystemProviderImpl(
+            // 个人理解Props是指定actor选项/配置
+            //Props is a configuration class to specify options for the creation of actors,
             final ClassLoader classLoader, final Props quarantinedMonitorActorProps, final Config akkaConfig) {
         LOG.info("Creating new ActorSystem");
 
+        // 创建akka actor system
         actorSystem = ActorSystem.create(ACTOR_SYSTEM_NAME, akkaConfig, classLoader);
 
+        // 创建Termination monitor actor
+        // 监听关闭actor system
         actorSystem.actorOf(Props.create(TerminationMonitor.class), TerminationMonitor.ADDRESS);
+
+        // 创建Quarantined Monitor Actor
+        // 用于监听Akka RemotingLifecycleEvent事件,如果节点被隔离，重启actor system去重新加入集群
         actorSystem.actorOf(quarantinedMonitorActorProps, QuarantinedMonitorActor.ADDRESS);
     }
 

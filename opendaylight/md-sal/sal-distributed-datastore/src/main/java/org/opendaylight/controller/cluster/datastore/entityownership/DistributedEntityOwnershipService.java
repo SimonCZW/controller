@@ -82,13 +82,15 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
     // invoke by blueprint: clustered-datastore.xml
     public static DistributedEntityOwnershipService start(final ActorContext context,
             final EntityOwnerSelectionStrategyConfig strategyConfig) {
-        // context是什么: ActorContext
+        // context是什么: ActorContext 封装了shard manage actor在创建datastore时被创建的
 
         ActorRef shardManagerActor = context.getShardManager();
 
         Configuration configuration = context.getConfiguration();
         // 获取member列表?
         Collection<MemberName> entityOwnersMemberNames = configuration.getUniqueMemberNamesForAllShards();
+
+        // 这里创建EntityOwnershipShard actor的build, 后面将此对象传递给manager去创建shard actor
         // Parameter1: module shard配置, the configuration of the new shard.
         // P2: used to obtain the Props for creating the shard actor instance.
         // P3: null, 意味着使用默认
@@ -96,7 +98,8 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
                 "entity-owners", ENTITY_OWNERSHIP_SHARD_NAME, ModuleShardStrategy.NAME, entityOwnersMemberNames),
                         newShardBuilder(context, strategyConfig), null);
 
-        // 异步操作?
+        // 让shard manage actor创建local eos shard
+        // 最终会调用ShardManager.onCreateShard()
         Future<Object> createFuture = context.executeOperationAsync(shardManagerActor,
                 createShard, MESSAGE_TIMEOUT);
 
@@ -133,7 +136,7 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
     @VisibleForTesting
     void executeLocalEntityOwnershipShardOperation(final Object message) {
         if (localEntityOwnershipShard == null) {
-            // 找到entity-ownership的本地shard ActorRef
+            // 找到entity-ownership的本地shard ActorRef/
             Future<ActorRef> future = context.findLocalShardAsync(ENTITY_OWNERSHIP_SHARD_NAME);
             future.onComplete(new OnComplete<ActorRef>() {
                 @Override
@@ -158,18 +161,24 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
             throws CandidateAlreadyRegisteredException {
         Preconditions.checkNotNull(entity, "entity cannot be null");
 
+        // 判断entity是否在本地注册, 未注册则put
         if (registeredEntities.putIfAbsent(entity, entity) != null) {
             throw new CandidateAlreadyRegisteredException(entity);
         }
 
+        // 封装entity的类，作为消息发送给 本地shard actor
+        //  Message sent to the local EntityOwnershipShard to register a candidate.
         RegisterCandidateLocal registerCandidate = new RegisterCandidateLocal(entity);
 
         LOG.debug("Registering candidate with message: {}", registerCandidate);
 
+        // 最终调用的是org.opendaylight.controller.cluster.datastore.entityownership.EntityOwnershipShard
         executeLocalEntityOwnershipShardOperation(registerCandidate);
+
         return new DistributedEntityOwnershipCandidateRegistration(entity, this);
     }
 
+    // 取消注册candidate
     void unregisterCandidate(final DOMEntity entity) {
         LOG.debug("Unregistering candidate for {}", entity);
 
@@ -177,6 +186,7 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
         registeredEntities.remove(entity);
     }
 
+    // 注册entity类型的 listener
     @Override
     public DOMEntityOwnershipListenerRegistration registerListener(final String entityType,
             final DOMEntityOwnershipListener listener) {
@@ -187,20 +197,24 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
 
         LOG.debug("Registering listener with message: {}", registerListener);
 
+        // 发送消息给local shard actor
         executeLocalEntityOwnershipShardOperation(registerListener);
         return new DistributedEntityOwnershipListenerRegistration(listener, entityType, this);
     }
 
+    // 获取entity的ownership
     @Override
     @SuppressFBWarnings(value = "NP_NULL_PARAM_DEREF", justification = "Unrecognised NullableDecl")
     public Optional<EntityOwnershipState> getOwnershipState(final DOMEntity forEntity) {
         Preconditions.checkNotNull(forEntity, "forEntity cannot be null");
 
+        // 获取local eos shard data tree
         DataTree dataTree = getLocalEntityOwnershipShardDataTree();
         if (dataTree == null) {
             return Optional.absent();
         }
 
+        // 从dataTree中读取传入entity
         java.util.Optional<NormalizedNode<?, ?>> entityNode = dataTree.takeSnapshot().readNode(
                 entityPath(forEntity.getType(), forEntity.getIdentifier()));
         if (!entityNode.isPresent()) {
@@ -217,6 +231,7 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
             return Optional.absent();
         }
 
+        // 判断是否为当前阶段是 owner
         MemberName localMemberName = context.getCurrentMemberName();
         java.util.Optional<DataContainerChild<? extends PathArgument, ?>> ownerLeaf = entity.getChild(
             ENTITY_OWNER_NODE_ID);
@@ -232,16 +247,20 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
         return registeredEntities.get(entity) != null;
     }
 
+    // 获取local entity ownership shard的 data tree
     @VisibleForTesting
     @SuppressWarnings("checkstyle:IllegalCatch")
     DataTree getLocalEntityOwnershipShardDataTree() {
         if (localEntityOwnershipShardDataTree == null) {
             try {
                 if (localEntityOwnershipShard == null) {
+                    // 通过scale并发库Await, find local shard
                     localEntityOwnershipShard = Await.result(context.findLocalShardAsync(
                             ENTITY_OWNERSHIP_SHARD_NAME), Duration.Inf());
                 }
 
+                // 通过akka.pattern.Patterns ask请求 local entity ownership shard的dataTree
+                // GetShardDataTree.INSTANCE 发送给actor的消息 获取shard的dataTree
                 localEntityOwnershipShardDataTree = (DataTree) Await.result(Patterns.ask(localEntityOwnershipShard,
                         GetShardDataTree.INSTANCE, MESSAGE_TIMEOUT), Duration.Inf());
             } catch (Exception e) {
@@ -262,6 +281,9 @@ public class DistributedEntityOwnershipService implements DOMEntityOwnershipServ
     public void close() {
     }
 
+    /*
+     * 这里创建 EntityOwnershipShard.Builder
+     */
     private static EntityOwnershipShard.Builder newShardBuilder(final ActorContext context,
             final EntityOwnerSelectionStrategyConfig strategyConfig) {
         return EntityOwnershipShard.newBuilder().localMemberName(context.getCurrentMemberName())

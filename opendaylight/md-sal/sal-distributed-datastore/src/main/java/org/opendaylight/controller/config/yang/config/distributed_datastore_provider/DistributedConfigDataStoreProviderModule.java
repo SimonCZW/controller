@@ -51,6 +51,7 @@ public class DistributedConfigDataStoreProviderModule extends AbstractDistribute
         return new ForwardingDistributedDataStore(delegate, tracker);
     }
 
+    // clustered-datastore.xml中实例化
     public static DatastoreContext newDatastoreContext() {
         return newDatastoreContext(null);
     }
@@ -58,6 +59,7 @@ public class DistributedConfigDataStoreProviderModule extends AbstractDistribute
     private static DatastoreContext newDatastoreContext(final ConfigProperties inProps) {
         ConfigProperties props = inProps;
         if (props == null) {
+            // org.apache.karaf.main.ConfigProperties ?
             props = new ConfigProperties();
         }
 
@@ -97,7 +99,7 @@ public class DistributedConfigDataStoreProviderModule extends AbstractDistribute
                 .transactionDebugContextEnabled(props.getTransactionDebugContextEnabled())
                 .customRaftPolicyImplementation(props.getCustomRaftPolicyImplementation())
                 .maximumMessageSliceSize(props.getMaximumMessageSliceSize().getValue().intValue())
-                .useTellBasedProtocol(props.getUseTellBasedProtocol())
+                .useTellBasedProtocol(props.getUseTellBasedProtocol()) // 设置true, 会创建DistributedDataStore
                 .syncIndexThreshold(props.getSyncIndexThreshold().getValue())
                 .backendAlivenessTimerIntervalInSeconds(props.getBackendAlivenessTimerIntervalInSeconds().getValue())
                 .frontendRequestTimeoutInSeconds(props.getFrontendRequestTimeoutInSeconds().getValue())

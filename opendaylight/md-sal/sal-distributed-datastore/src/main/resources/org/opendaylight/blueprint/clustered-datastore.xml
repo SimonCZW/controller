@@ -19,22 +19,34 @@
     <argument ref="blueprintBundleContext" />
   </bean>
 
+  <!-- QuarantinedMonitorActorPropsFactory是Quarantined Monitor Actor的属性
+        Props定义: Props is a configuration class to specify options for the creation of actors,
+        而在这个factory类中定义了QuarantinedMonitorActor的props的callback方法，方法作用：
+          停止bundle: bundleContext.getBundle(0).stop();
+  -->
   <bean id="actorSystemProps" class="org.opendaylight.controller.config.yang.config.actor_system_provider.impl.factory.osgi.QuarantinedMonitorActorPropsFactory"
           factory-method="createProps">
     <argument ref="blueprintBundleContext" />
   </bean>
 
+  <!-- 读取akka配置
+      private static final String CUSTOM_AKKA_CONF_PATH = "./configuration/initial/akka.conf";
+      private static final String FACTORY_AKKA_CONF_PATH = "./configuration/factory/akka.conf";
+  -->
   <bean id="akkaReader" class="org.opendaylight.controller.cluster.common.actor.FileAkkaConfigurationReader"/>
   <bean id="akkaConfig" class="org.opendaylight.controller.config.yang.config.actor_system_provider.impl.factory.AkkaConfigFactory"
           factory-method="createAkkaConfig">
     <argument ref="akkaReader" />
   </bean>
 
+  <!-- 创建akka actor system Provider
+        ActorSystemProviderImpl实例化会:马上创建两个actor分别监听 关闭事件和被其他节点隔离事件; 会读取akka配置
+  -->
   <bean id="actorSystemProvider" class="org.opendaylight.controller.config.yang.config.actor_system_provider.impl.ActorSystemProviderImpl"
           destroy-method="close">
     <argument ref="bundleClassLoader" />
-    <argument ref="actorSystemProps"/>
-    <argument ref="akkaConfig"/>
+    <argument ref="actorSystemProps"/> <!-- 传入创建QuarantinedMonitorActor需要的props(理解为属性) -->
+    <argument ref="akkaConfig"/> <!-- akka配置 -->
   </bean>
 
   <service ref="actorSystemProvider" interface="org.opendaylight.controller.cluster.ActorSystemProvider"/>
@@ -43,24 +55,42 @@
   <cm:cm-properties id="datastoreProps" persistent-id="org.opendaylight.controller.cluster.datastore"/>
 
   <!-- Distributed Config Datastore -->
+  <!-- 读取backup datastore, This class looks for a previously saved data store backup file in a directory -->
   <bean id="datastoreSnapshotRestore" class="org.opendaylight.controller.cluster.datastore.DatastoreSnapshotRestore"
           factory-method="instance">
     <argument value="./clustered-datastore-restore"/>
   </bean>
 
+  <!-- 创建CONFIGURATION的data store的context(读取文件设置的配置,比如是否datastore Persistent)
+        创建org.opendaylight.controller.cluster.datastore.DatastoreContext对象, 封装config datastore的初始化配置(context)
+  -->
   <bean id="configDatastoreContext" class="org.opendaylight.controller.config.yang.config.distributed_datastore_provider.DistributedConfigDataStoreProviderModule"
           factory-method="newDatastoreContext" />
 
+  <!-- 封装DatastoreContext -->
   <bean id="introspectorConfig" class="org.opendaylight.controller.cluster.datastore.DatastoreContextIntrospector">
     <argument ref="configDatastoreContext"/>
   </bean>
 
+  <!-- 用于创建DatastoreContextPropertiesUpdater, 监听运行期间datastore context(属性)变化做出动作:
+          调用AbstractDataStore中的onDatastoreContextUpdated()
+  -->
   <bean id="updaterConfig" class="org.opendaylight.controller.cluster.datastore.DatastoreContextPropertiesUpdater">
     <cm:managed-properties persistent-id="org.opendaylight.controller.cluster.datastore" update-strategy="component-managed" update-method="update"/>
     <argument ref="introspectorConfig"/>
     <argument ref="datastoreProps"/>
   </bean>
 
+  <!-- 创建configration datastore
+       会有操作：
+        1.读取module-shard等配置
+        2.协商akka cluster集群(根据配置)
+        3.创建datastore,默认tell模式是ClientBackedDataStore,配置ask模式是DistributedDataStore
+          创建datastore均会:
+            1.创建shard manager actor
+            2.创建本地datastore client actor
+            3.创建actorContext(有shard manager actor的ActorRef/可以发消息给manager)
+  -->
   <bean id="configDatastore" class="org.opendaylight.controller.cluster.datastore.DistributedDataStoreFactory"
           factory-method="createInstance" destroy-method="close">
     <argument ref="schemaService"/>
@@ -100,6 +130,16 @@
     <argument ref="datastoreProps"/>
   </bean>
 
+  <!-- 创建operational datastore
+       会有操作：
+        1.读取module-shard等配置
+        2.协商akka cluster集群(根据配置)
+        3.创建datastore,默认tell模式是ClientBackedDataStore,配置ask模式是DistributedDataStore
+          创建datastore均会:
+            1.创建shard manager actor
+            2.创建本地datastore client actor
+            3.创建actorContext(有shard manager actor的ActorRef/可以发消息给manager)
+  -->
   <bean id="operDatastore" class="org.opendaylight.controller.cluster.datastore.DistributedDataStoreFactory"
           factory-method="createInstance" destroy-method="close">
     <argument ref="schemaService"/>
@@ -178,6 +218,11 @@
   <bean id="distributedEntityOwnershipService" class="org.opendaylight.controller.cluster.datastore.entityownership.DistributedEntityOwnershipService"
           factory-method="start" destroy-method="close">
     <argument>
+      <!-- 调用operDatastore.getActorContext
+          返回的是： org.opendaylight.controller.cluster.datastore.utils.ActorContext
+          其有shard manager actor的ActorRef，可以与manager通信
+      -->
+      <!-- 可以看到distributedEntityOwnershipService基于的是operational datastore-->
       <bean factory-ref="operDatastore" factory-method="getActorContext"/>
     </argument>
     <argument ref="selectionStrategyConfig"/>

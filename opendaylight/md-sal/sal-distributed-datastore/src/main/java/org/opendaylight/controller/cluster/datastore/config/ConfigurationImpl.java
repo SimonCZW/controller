@@ -49,6 +49,7 @@ public class ConfigurationImpl implements Configuration {
 
     public ConfigurationImpl(final ModuleShardConfigProvider provider) {
         ImmutableMap.Builder<String, ModuleConfig> mapBuilder = ImmutableMap.builder();
+        // 读取配置?
         for (Map.Entry<String, ModuleConfig.Builder> e: provider.retrieveModuleConfigs(this).entrySet()) {
             mapBuilder.put(e.getKey(), e.getValue().build());
         }

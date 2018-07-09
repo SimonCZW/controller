@@ -134,6 +134,7 @@ import scala.concurrent.duration.FiniteDuration;
  * <li> Monitor the cluster members and store their addresses
  * </ul>
  */
+// shard manager actor, 又一actor例子
 class ShardManager extends AbstractUntypedPersistentActorWithMetering {
     private static final Logger LOG = LoggerFactory.getLogger(ShardManager.class);
 
@@ -183,6 +184,7 @@ class ShardManager extends AbstractUntypedPersistentActorWithMetering {
         this.configuration = builder.getConfiguration();
         this.datastoreContextFactory = builder.getDatastoreContextFactory();
         this.type = datastoreContextFactory.getBaseDatastoreContext().getDataStoreName();
+        // 获取actorSystem的 dispatcher
         this.shardDispatcherPath =
                 new Dispatchers(context().system().dispatchers()).getDispatcherPath(Dispatchers.DispatcherType.Shard);
         this.waitTillReadyCountdownLatch = builder.getWaitTillReadyCountDownLatch();
@@ -192,11 +194,16 @@ class ShardManager extends AbstractUntypedPersistentActorWithMetering {
         String possiblePersistenceId = datastoreContextFactory.getBaseDatastoreContext().getShardManagerPersistenceId();
         persistenceId = possiblePersistenceId != null ? possiblePersistenceId : "shard-manager-" + type;
 
+        // 用于解析集群中的成员地址
         peerAddressResolver = new ShardPeerAddressResolver(type, cluster.getCurrentMemberName());
 
         // Subscribe this actor to cluster member events
+        // 订阅了      ClusterEvent.MemberEvent.class,
+        //            ClusterEvent.UnreachableMember.class,
+        //            ClusterEvent.ReachableMember.class
         cluster.subscribeToMemberEvents(getSelf());
 
+        // 应该是用于MBean管理接口
         shardManagerMBean = new ShardManagerInfo(getSelf(), cluster.getCurrentMemberName(),
                 "shard-manager-" + this.type,
                 datastoreContextFactory.getBaseDatastoreContext().getDataStoreMXBeanType());
@@ -222,6 +229,7 @@ class ShardManager extends AbstractUntypedPersistentActorWithMetering {
         }
     }
 
+    // 处理消息
     @Override
     public void handleCommand(final Object message) throws Exception {
         if (message  instanceof FindPrimary) {
@@ -257,6 +265,7 @@ class ShardManager extends AbstractUntypedPersistentActorWithMetering {
         } else if (message instanceof SwitchShardBehavior) {
             onSwitchShardBehavior((SwitchShardBehavior) message);
         } else if (message instanceof CreateShard) {
+            // 创建shard(会创建actor)
             onCreateShard((CreateShard)message);
         } else if (message instanceof AddShardReplica) {
             onAddShardReplica((AddShardReplica) message);
@@ -589,6 +598,7 @@ class ShardManager extends AbstractUntypedPersistentActorWithMetering {
                 LOG.debug("{}: Shard {} already exists", persistenceId(), shardName);
                 reply = new Status.Success(String.format("Shard with name %s already exists", shardName));
             } else {
+                // 创建shard
                 doCreateShard(createShard);
                 reply = new Status.Success(null);
             }
@@ -685,6 +695,9 @@ class ShardManager extends AbstractUntypedPersistentActorWithMetering {
         removeShard(shardId);
     }
 
+    /**
+     * 创建shard方法
+     */
     private void doCreateShard(final CreateShard createShard) {
         final ModuleShardConfiguration moduleShardConfig = createShard.getModuleShardConfig();
         final String shardName = moduleShardConfig.getShardName();
@@ -725,6 +738,7 @@ class ShardManager extends AbstractUntypedPersistentActorWithMetering {
                 persistenceId(), shardId, moduleShardConfig.getShardMemberNames(), peerAddresses,
                 isActiveMember);
 
+        // 这里会存储shard actor的builer用于创建actor: createShard.getShardBuilder()
         ShardInformation info = new ShardInformation(shardName, shardId, peerAddresses,
                 shardDatastoreContext, createShard.getShardBuilder(), peerAddressResolver);
         info.setActiveMember(isActiveMember);
@@ -732,6 +746,7 @@ class ShardManager extends AbstractUntypedPersistentActorWithMetering {
 
         if (schemaContext != null) {
             info.setSchemaContext(schemaContext);
+            // 这里会创建shard actor : createShard.getShardBuilder()
             info.setActor(newShardActor(info));
         }
     }
@@ -1723,6 +1738,7 @@ class ShardManager extends AbstractUntypedPersistentActorWithMetering {
 
     }
 
+    // 比如 在DistributedEntityOwnershipService.executeLocalEntityOwnershipShardOperation中会通过context发消息给manager, 最终manager调用到这里
     private void findLocalShard(final FindLocalShard message) {
         LOG.debug("{}: findLocalShard : {}", persistenceId(), message.getShardName());
 
@@ -1736,6 +1752,7 @@ class ShardManager extends AbstractUntypedPersistentActorWithMetering {
             return;
         }
 
+        // 返回LocalShardFound, 带有此shard的actor的ActorRef
         sendResponse(shardInformation, message.isWaitUntilInitialized(), false,
             () -> new LocalShardFound(shardInformation.getActor()));
     }

@@ -40,7 +40,8 @@ import org.slf4j.LoggerFactory;
  * i
  * @author Thomas Pantelis
  */
-public class DatastoreContextIntrospector {
+public class public class DatastoreContextIntrospector {
+    {
     private static final Logger LOG = LoggerFactory.getLogger(DatastoreContextIntrospector.class);
 
     private static final Map<String, Class<?>> DATA_STORE_PROP_TYPES = new HashMap<>();
@@ -191,6 +192,7 @@ public class DatastoreContextIntrospector {
     @GuardedBy(value = "this")
     private Map<String, Object> currentProperties;
 
+    // 构造器
     public DatastoreContextIntrospector(final DatastoreContext context) {
         this.context = context;
     }
@@ -236,6 +238,7 @@ public class DatastoreContextIntrospector {
      * @param properties the properties to apply
      * @return true if the cached DatastoreContext was updated, false otherwise.
      */
+    // 在org.opendaylight.controller.cluster.datastore.DatastoreContextPropertiesUpdater中被调用
     public synchronized boolean update(final Map<String, Object> properties) {
         currentProperties = null;
         if (properties == null || properties.isEmpty()) {

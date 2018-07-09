@@ -82,6 +82,7 @@ import scala.concurrent.duration.FiniteDuration;
  *
  * @author Thomas Pantelis
  */
+// 在哪里实例化?
 class EntityOwnershipShard extends Shard {
     private final MemberName localMemberName;
     private final EntityOwnershipShardCommitCoordinator commitCoordinator;

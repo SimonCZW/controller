@@ -23,7 +23,7 @@ import org.opendaylight.controller.sal.core.spi.data.DOMStoreTransactionChain;
 import org.opendaylight.controller.sal.core.spi.data.DOMStoreWriteTransaction;
 
 /**
- * Implements a distributed DOMStore using ClientActor.
+ * Implements a distributed DOMStore using ClientActor. //isUseTellBasedProtocol() use "tell"
  */
 public class ClientBackedDataStore extends AbstractDataStore {
 

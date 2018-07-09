@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
  * @author Gary Wu gary.wu1@huawei.com
  *
  */
+// 一个actor的实现例子
 public class QuarantinedMonitorActor extends UntypedActor {
 
     private static final Logger LOG = LoggerFactory.getLogger(QuarantinedMonitorActor.class);
@@ -32,6 +33,8 @@ public class QuarantinedMonitorActor extends UntypedActor {
     private final Effect callback;
     private boolean quarantined;
 
+    // 从blueprint看到传入此actor的props属性来自：QuarantinedMonitorActorPropsFactory
+    // 在没细看再底层代码,猜测callback为QuarantinedMonitorActorPropsFactory中指定的函数: 其作用stop bundle
     protected QuarantinedMonitorActor(final Effect callback) {
         this.callback = callback;
 
@@ -45,6 +48,7 @@ public class QuarantinedMonitorActor extends UntypedActor {
         LOG.debug("Stopping QuarantinedMonitorActor");
     }
 
+    // actor接收message
     @Override
     public void onReceive(final Object message) throws Exception {
         final String messageType = message.getClass().getSimpleName();
@@ -55,12 +59,14 @@ public class QuarantinedMonitorActor extends UntypedActor {
             return;
         }
 
+        // 被隔离
         if (message instanceof ThisActorSystemQuarantinedEvent) {
             final ThisActorSystemQuarantinedEvent event = (ThisActorSystemQuarantinedEvent) message;
             LOG.warn("Got quarantined by {}", event.remoteAddress());
             quarantined = true;
 
             // execute the callback
+            // 应该是stop bundle动作
             callback.apply();
         }
     }
