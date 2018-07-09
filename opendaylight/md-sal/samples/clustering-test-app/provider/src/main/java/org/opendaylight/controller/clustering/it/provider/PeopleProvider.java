@@ -51,15 +51,19 @@ public class PeopleProvider implements PeopleService, AutoCloseable {
   public Future<RpcResult<Void>> addPerson(final AddPersonInput input) {
     LOG.info("RPC addPerson : adding person [{}]", input);
 
+    // 在YANG中input直接 uses person,所以可以直接build
     PersonBuilder builder = new PersonBuilder(input);
     final Person person = builder.build();
     final SettableFuture<RpcResult<Void>> futureResult = SettableFuture.create();
 
+    // Build Person的ID
     // Each entry will be identifiable by a unique key, we have to create that identifier
     final InstanceIdentifier.InstanceIdentifierBuilder<Person> personIdBuilder =
         InstanceIdentifier.<People>builder(People.class)
             .child(Person.class, person.getKey());
     final InstanceIdentifier<Person> personId = personIdBuilder.build();
+
+    // 写入YANG
     // Place entry in data store tree
     WriteTransaction tx = dataProvider.newWriteOnlyTransaction();
     tx.put(LogicalDatastoreType.CONFIGURATION, personId, person, true);

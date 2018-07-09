@@ -64,6 +64,7 @@ public class SingletonGetConstantService implements DOMRpcImplementation, Cluste
         this.constant = constant;
     }
 
+    // 注册singleton service
     public static ClusterSingletonServiceRegistration registerNew(final ClusterSingletonServiceProvider singletonService,
                                                                   final DOMRpcProviderService rpcProviderService,
                                                                   final String constant) {
@@ -73,6 +74,20 @@ public class SingletonGetConstantService implements DOMRpcImplementation, Cluste
                 .registerClusterSingletonService(new SingletonGetConstantService(rpcProviderService, constant));
     }
 
+    /*
+        rpc get-singleton-constant {
+        description "Return the constant string provided by the previously registered implementation.
+            Propagate appropriate error if no, unreachable, or failing implementation is found.
+            This is basically the same as get-constant, but it can have a different
+            implementation registered, thus allowing to track both implementations in longevity jobs.";
+        // No input.
+        output {
+            uses llc:constant-grouping;
+        }
+        }
+
+        代码内直径build返回的node而不是使用编译后的builder
+     */
     @Nonnull
     @Override
     public CheckedFuture<DOMRpcResult, DOMRpcException> invokeRpc(@Nonnull DOMRpcIdentifier rpc, @Nullable NormalizedNode<?, ?> input) {
@@ -91,11 +106,14 @@ public class SingletonGetConstantService implements DOMRpcImplementation, Cluste
         return Futures.immediateCheckedFuture(new DefaultDOMRpcResult(result));
     }
 
+    // 注册singleton成功，service启动后会执行
     @Override
     public void instantiateServiceInstance() {
         LOG.debug("Gained ownership of get-singleton-constant, registering service into rpcService");
+        // 代码内创建DOMRpcId并注册到rpc, 非blueprint注入
         final DOMRpcIdentifier id = DOMRpcIdentifier.create(SchemaPath.create(true, GET_SINGLETON_CONSTANT));
 
+        // 注册DOMRpc
         rpcRegistration = rpcProviderService.registerRpcImplementation(this, id);
     }
 

@@ -66,6 +66,7 @@ module odl-mdsal-lowlevel-control {
         // No output.
     }
 
+    // 注册singleton实例
     rpc register-singleton-constant {
         description "Upon receiving this, the member checks whether it has already registered
             a singleton application, and fails if yes. If no, the member creates
@@ -82,6 +83,7 @@ module odl-mdsal-lowlevel-control {
         // No output.
     }
 
+    // 取消singleton实例的注册
     rpc unregister-singleton-constant {
         description "Upon receiving this, the member checks whether it has currently registered
             a singleton application, and fails if no. If yes, the member shall unregister
@@ -124,6 +126,7 @@ module odl-mdsal-lowlevel-control {
         }
     }
 
+    // 开启notifications publish
     rpc start-publish-notifications {
         description "Upon receiving this, the member checks whether it is already in the middle of publishing,
             for this id, and fails if yes. If no, the member shall clear any state tracking data possibly present

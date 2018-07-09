@@ -5,11 +5,17 @@
     odl:use-default-for-reference-types="true">
 
   <reference id="dataBroker" interface="org.opendaylight.controller.md.sal.binding.api.DataBroker"/>
+  <!-- -->
   <reference id="notificationService" interface="org.opendaylight.controller.sal.binding.api.NotificationProviderService"/>
+
+  <!-- 使用DistributedEntityOwnershipService -->
   <reference id="entityOwnershipService" interface="org.opendaylight.controller.md.sal.common.api.clustering.EntityOwnershipService"/>
+
   <reference id="bindingRpcRegistry" interface="org.opendaylight.controller.sal.binding.api.RpcProviderRegistry"/>
   <reference id="domRpcProviderService" interface="org.opendaylight.controller.md.sal.dom.api.DOMRpcProviderService"/>
+  <!-- 使用ClusterSingletonServiceProvider -->
   <reference id="clusterSingletonService" interface="org.opendaylight.mdsal.singleton.common.api.ClusterSingletonServiceProvider"/>
+
   <reference id="domDataBroker" interface="org.opendaylight.controller.md.sal.dom.api.DOMDataBroker"/>
   <reference id="schemaService" interface="org.opendaylight.controller.sal.core.api.model.SchemaService"/>
   <reference id="normalizedNodeSerializer" interface="org.opendaylight.mdsal.binding.dom.codec.api.BindingNormalizedNodeSerializer"/>
@@ -17,11 +23,14 @@
   <reference id="notificationListenerService" interface="org.opendaylight.controller.md.sal.binding.api.NotificationService" />
   <reference id="domDataTreeService" interface="org.opendaylight.mdsal.dom.api.DOMDataTreeService"/>
   <reference id="distributedShardFactory" interface="org.opendaylight.controller.cluster.sharding.DistributedShardFactory"/>
+
+  <!-- 使用DistributedDataStore -->
   <reference id="configDatastore" interface="org.opendaylight.controller.cluster.datastore.DistributedDataStoreInterface"
              odl:type="distributed-config"/>
+
   <reference id="actorSystemProvider" interface="org.opendaylight.controller.cluster.ActorSystemProvider"/>
 
-
+  <!-- rpc带notification测试 -->
   <bean id="purchaseCarProvider" class="org.opendaylight.controller.clustering.it.provider.PurchaseCarProvider" >
     <property name="notificationProvider" ref="notificationService"/>
   </bean>
@@ -35,20 +44,22 @@
 
   <bean id="carProvider" class="org.opendaylight.controller.clustering.it.provider.CarProvider"
        destroy-method="close">
-    <argument ref="dataBroker"/>
-    <argument ref="entityOwnershipService"/>
-    <argument ref="domDataBroker"/>
+    <argument ref="dataBroker"/> <!-- binding的dataBroker -->
+    <argument ref="entityOwnershipService"/> <!-- DistributedEntityOwnershipService -->
+    <argument ref="domDataBroker"/> <!-- dom的dataBroker -->
   </bean>
 
   <odl:rpc-implementation ref="carProvider"/>
   <odl:rpc-implementation ref="peopleProvider"/>
 
+  <!-- notification listener测试 -->
   <bean id="peopleCarListener" class="org.opendaylight.controller.clustering.it.listener.PeopleCarListener" >
     <property name="dataProvider" ref="dataBroker"/>
   </bean>
 
   <odl:notification-listener ref="peopleCarListener"/>
 
+  <!-- global rpc测试 -->
   <bean id="basicTestProvider" class="org.opendaylight.controller.clustering.it.provider.BasicRpcTestProvider">
     <argument ref="bindingRpcRegistry"/>
     <argument ref="clusterSingletonService"/>

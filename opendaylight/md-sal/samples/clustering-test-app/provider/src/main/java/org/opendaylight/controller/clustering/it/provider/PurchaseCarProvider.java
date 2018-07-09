@@ -37,10 +37,12 @@ public class PurchaseCarProvider implements CarPurchaseService, AutoCloseable{
   public Future<RpcResult<Void>> buyCar(BuyCarInput input) {
     LOG.info("Routed RPC buyCar : generating notification for buying car [{}]", input);
     SettableFuture<RpcResult<Void>> futureResult = SettableFuture.create();
+    // 发notification
     CarBoughtBuilder carBoughtBuilder = new CarBoughtBuilder();
     carBoughtBuilder.setCarId(input.getCarId());
     carBoughtBuilder.setPersonId(input.getPersonId());
     notificationProvider.publish(carBoughtBuilder.build());
+
     futureResult.set(RpcResultBuilder.<Void>success().build());
     return futureResult;
   }

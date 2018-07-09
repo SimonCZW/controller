@@ -71,6 +71,7 @@ public class CarProvider implements CarService {
     private final AtomicLong succcessCounter = new AtomicLong();
     private final AtomicLong failureCounter = new AtomicLong();
 
+    // 实现了一个内部类CarEntityOwnershipListener实现ntityOwnershipListener
     private final CarEntityOwnershipListener ownershipListener = new CarEntityOwnershipListener();
     private final AtomicBoolean registeredListener = new AtomicBoolean();
 
@@ -87,6 +88,7 @@ public class CarProvider implements CarService {
     public CarProvider(final DataBroker dataProvider, final EntityOwnershipService ownershipService,
             final DOMDataBroker domDataBroker) {
         this.dataProvider = dataProvider;
+        // 传入DistributedEntityOwnershipService
         this.ownershipService = ownershipService;
         this.domDataBroker = domDataBroker;
     }
@@ -214,12 +216,15 @@ public class CarProvider implements CarService {
     }
 
 
+    // 注册ownership rpc
+    // 理解: register candidate会自动写入 entity-ownership的YANG树
     @Override
     public Future<RpcResult<Void>> registerOwnership(final RegisterOwnershipInput input) {
         if(registeredListener.compareAndSet(false, true)) {
             ownershipService.registerListener(ENTITY_TYPE, ownershipListener);
         }
 
+        // new 一个entity对象，type自定义"cars"
         Entity entity = new Entity(ENTITY_TYPE, input.getCarId());
         try {
             ownershipService.registerCandidate(entity);
@@ -236,6 +241,7 @@ public class CarProvider implements CarService {
         return RpcResultBuilder.<Void>success().buildFuture();
     }
 
+    // 实现EntityOwnershipListener接口，当entity ownership改变会触发方法
     private static class CarEntityOwnershipListener implements EntityOwnershipListener {
         @Override
         public void ownershipChanged(final EntityOwnershipChange ownershipChange) {

@@ -183,12 +183,16 @@ public class MdsalLowLevelTestProvider implements OdlMdsalLowlevelControlService
         domDataTreeChangeService =
                 (DOMDataTreeChangeService) domDataBroker.getSupportedExtensions().get(DOMDataTreeChangeService.class);
 
+        // 注册rpc实现: odl-mdsal-lowlevel-control.yang
         registration = rpcRegistry.addRpcImplementation(OdlMdsalLowlevelControlService.class, this);
 
         prefixShardHandler = new PrefixShardHandler(distributedShardFactory, domDataTreeService,
                 bindingNormalizedNodeSerializer);
     }
 
+    /*
+        取消singleton Service实例的注册
+     */
     @Override
     public Future<RpcResult<Void>> unregisterSingletonConstant() {
         LOG.debug("unregister-singleton-constant");
@@ -215,10 +219,14 @@ public class MdsalLowLevelTestProvider implements OdlMdsalLowlevelControlService
         }
     }
 
+    /*
+        开启publish notifications
+     */
     @Override
     public Future<RpcResult<Void>> startPublishNotifications(final StartPublishNotificationsInput input) {
         LOG.debug("publish-notifications, input: {}", input);
 
+        // notificationPublishService.putNotification(notification); 通知
         final PublishNotificationsTask task = new PublishNotificationsTask(notificationPublishService, input.getId(),
                 input.getSeconds(), input.getNotificationsPerSecond());
 
@@ -276,6 +284,7 @@ public class MdsalLowLevelTestProvider implements OdlMdsalLowlevelControlService
             return Futures.immediateFuture(RpcResultBuilder.<Void>failed().withRpcError(error).build());
         }
 
+        // 注册notificationService的监听器
         ynlRegistrations.put(input.getId(),
                 notificationService.registerNotificationListener(new YnlListener(input.getId())));
 
@@ -315,6 +324,9 @@ public class MdsalLowLevelTestProvider implements OdlMdsalLowlevelControlService
         return Futures.immediateFuture(RpcResultBuilder.<Void>success().build());
     }
 
+    /*
+        注册singleton service实例
+     */
     @Override
     public Future<RpcResult<Void>> registerSingletonConstant(final RegisterSingletonConstantInput input) {
 
@@ -326,6 +338,7 @@ public class MdsalLowLevelTestProvider implements OdlMdsalLowlevelControlService
             return Futures.immediateFuture(RpcResultBuilder.<Void>failed().withRpcError(error).build());
         }
 
+        // 实际上是 singletonService.registerClusterSingletonService()
         getSingletonConstantRegistration =
                 SingletonGetConstantService.registerNew(singletonService, domRpcService, input.getConstant());
 
@@ -379,6 +392,10 @@ public class MdsalLowLevelTestProvider implements OdlMdsalLowlevelControlService
         return null;
     }
 
+    /*
+        subscribes a Yang notification listener to listen for
+            llt:id-sequence notifications.
+     */
     @Override
     public Future<RpcResult<Void>> subscribeDdtl() {
 
@@ -611,6 +628,7 @@ public class MdsalLowLevelTestProvider implements OdlMdsalLowlevelControlService
         final FiniteDuration duration = FiniteDuration.apply(timeoutInMS, TimeUnit.MILLISECONDS);
         final scala.concurrent.Promise<Boolean> shutdownShardAsk = akka.dispatch.Futures.promise();
 
+        // 代码内调用shard manager actor
         context.findLocalShardAsync(shardName).onComplete(new OnComplete<ActorRef>() {
             @Override
             public void onComplete(final Throwable throwable, final ActorRef actorRef) throws Throwable {
@@ -665,6 +683,9 @@ public class MdsalLowLevelTestProvider implements OdlMdsalLowlevelControlService
         return null;
     }
 
+    /*
+        unsubscribe yang notification
+     */
     @Override
     public Future<RpcResult<UnsubscribeDdtlOutput>> unsubscribeDdtl() {
         LOG.debug("Received unsubscribe-ddtl.");
@@ -696,15 +717,19 @@ public class MdsalLowLevelTestProvider implements OdlMdsalLowlevelControlService
                     .withRpcError(error).build());
         }
 
+        /////// 这里为什么需要创建distributed datastore client ?
         final String shardName = ClusterUtils.getCleanShardName(ProduceTransactionsHandler.ID_INTS_YID);
         LOG.debug("Creating distributed datastore client for shard {}", shardName);
 
+        // 代码内创建actor: datastore client
         final ActorContext actorContext = configDataStore.getActorContext();
         final Props distributedDataStoreClientProps =
                 SimpleDataStoreClientActor.props(actorContext.getCurrentMemberName(),
                         "Shard-" + shardName, actorContext, shardName);
 
         final ActorRef clientActor = actorSystem.actorOf(distributedDataStoreClientProps);
+
+        // 创建data store client
         final DataStoreClient distributedDataStoreClient;
         try {
             distributedDataStoreClient = SimpleDataStoreClientActor
